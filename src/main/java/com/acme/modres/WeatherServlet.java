@@ -5,7 +5,6 @@ import com.acme.modres.exception.ExceptionHandler;
 import com.acme.modres.mbean.AppInfo;
 
 import java.io.BufferedReader;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.management.ManagementFactory;
@@ -13,7 +12,6 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,9 +33,13 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectInstance;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.annotation.WebServlet;
+
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse;
+import software.amazon.awssdk.services.secretsmanager.model.SecretsManagerException;
 
 @WebServlet({ "/resorts/weather" })
 public class WeatherServlet extends HttpServlet {
@@ -46,14 +48,15 @@ public class WeatherServlet extends HttpServlet {
   @Inject
   private ModResortsCustomerInformation customerInfo;
 
-  // local OS environment variable key name. The key value should provide an API
-  // key that will be used to
-  // get weather information from site: http://www.wunderground.com
+  // Environment variable key for the AWS Secrets Manager secret name/ARN
+  // that stores the Weather API key. Set AWS_SECRET_NAME to the secret name
+  // configured in AWS Secrets Manager (e.g., "modresorts/weather-api-key").
+  private static final String AWS_SECRET_NAME_ENV = "AWS_SECRET_NAME";
+
+  // Fallback: direct environment variable key for the API key (legacy support)
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
-
-  private static InitialContext context;
 
   MBeanServer server;
   ObjectName weatherON;
@@ -65,7 +68,6 @@ public class WeatherServlet extends HttpServlet {
     try {
       weatherON = new ObjectName("com.acme.modres.mbean:name=appInfo");
     } catch (MalformedObjectNameException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
     try {
@@ -75,7 +77,6 @@ public class WeatherServlet extends HttpServlet {
     } catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
       e.printStackTrace();
     }
-    context = setInitialContextProps();
   }
 
   @Override
@@ -84,7 +85,6 @@ public class WeatherServlet extends HttpServlet {
       try {
         server.unregisterMBean(weatherON);
       } catch (MBeanRegistrationException | InstanceNotFoundException e) {
-        // TODO Auto-generated catch block
         e.printStackTrace();
       }
     }
@@ -106,7 +106,9 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    // Retrieve the Weather API key from AWS Secrets Manager for secure,
+    // centralized secret management with automatic rotation support.
+    String weatherAPIKey = getWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -118,6 +120,40 @@ public class WeatherServlet extends HttpServlet {
           "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
       getDefaultWeatherData(city, response);
     }
+  }
+
+  /**
+   * Retrieves the Weather API key from AWS Secrets Manager.
+   * Falls back to the WEATHER_API_KEY environment variable for local development.
+   * Replaces hardcoded credentials with centralized AWS secret management,
+   * enabling automatic rotation and audit logging.
+   */
+  private String getWeatherApiKey() {
+    String secretName = System.getenv(AWS_SECRET_NAME_ENV);
+    if (secretName != null && !secretName.trim().isEmpty()) {
+      try {
+        String awsRegion = System.getenv("AWS_REGION") != null ? System.getenv("AWS_REGION") : "us-east-1";
+        try (SecretsManagerClient secretsClient = SecretsManagerClient.builder()
+            .region(Region.of(awsRegion))
+            .build()) {
+          GetSecretValueRequest getSecretValueRequest = GetSecretValueRequest.builder()
+              .secretId(secretName)
+              .build();
+          GetSecretValueResponse getSecretValueResponse = secretsClient.getSecretValue(getSecretValueRequest);
+          String secretValue = getSecretValueResponse.secretString();
+          logger.info("Weather API key retrieved from AWS Secrets Manager: " + secretName);
+          return secretValue;
+        }
+      } catch (SecretsManagerException e) {
+        logger.warning("Failed to retrieve secret from AWS Secrets Manager: " + e.getMessage()
+            + ". Falling back to environment variable.");
+      } catch (Exception e) {
+        logger.warning("Unexpected error retrieving secret: " + e.getMessage()
+            + ". Falling back to environment variable.");
+      }
+    }
+    // Fallback to direct environment variable (for local development / migration period)
+    return System.getenv(WEATHER_API_KEY);
   }
 
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
@@ -223,11 +259,9 @@ public class WeatherServlet extends HttpServlet {
       String errorMsg = "Problem occured when getting the default weather data.";
       ExceptionHandler.handleException(e, errorMsg, logger);
     } finally {
-
       if (out != null) {
         out.close();
       }
-
       out = null;
     }
   }
@@ -247,32 +281,5 @@ public class WeatherServlet extends HttpServlet {
     }
     String lastToKeep = toBeMocked.substring(toBeMocked.length() - 3);
     return "*********" + lastToKeep;
-  }
-
-  private String configureEnvDiscovery() {
-
-    String serverEnv = "";
-
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
-
-    return serverEnv;
-  }
-
-  private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
-    InitialContext ctx = null;
-    try {
-      ctx = new InitialContext(ht);
-    } catch (NamingException e) {
-      e.printStackTrace();
-    }
-
-    return ctx;
   }
 }

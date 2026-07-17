@@ -1,51 +1,46 @@
 package com.acme.modres.util;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 
 import com.google.gson.Gson;
 
-public class JsonInputStream extends FileInputStream {
+/**
+ * Utility class for parsing JSON from an InputStream.
+ * Refactored from FileInputStream-based implementation to support
+ * cloud-native storage sources (Amazon S3, classpath) without
+ * requiring local file system access.
+ */
+public class JsonInputStream implements Closeable {
 
-  private File file;
+  private final InputStream inputStream;
 
-  public JsonInputStream(File file) throws FileNotFoundException {
-    super(file);
-    this.file = file;
+  public JsonInputStream(InputStream inputStream) {
+    this.inputStream = inputStream;
   }
 
   public Object parseJsonAs(Class<?> cls) {
-    if (file.exists()) {
-      JsonInputStream is = null;
-      Object jsonObject = null;
-      try {
-        is = new JsonInputStream(file);
-        Gson gson = new Gson();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-        jsonObject = gson.fromJson(reader, cls);
-      } catch (Exception e) {
-        e.printStackTrace();
-      } catch (Throwable e) {
-        e.printStackTrace();
-      } finally {
-        if (is != null) {
-          try {
-            is.close();
-            is.read(); // test if file is closed
-          } catch (IOException e) {
-            // closed successfully
-            return jsonObject;
-          } catch (Throwable e) {
-            e.printStackTrace();
-          }
-        }
-      }
+    if (inputStream == null) {
+      return null;
+    }
+    try {
+      Gson gson = new Gson();
+      BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+      return gson.fromJson(reader, cls);
+    } catch (Exception e) {
+      e.printStackTrace();
     }
     return null;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (inputStream != null) {
+      inputStream.close();
+    }
   }
 
 }
