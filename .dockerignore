@@ -1,0 +1,59 @@
+# ModResorts Application - Docker Ignore
+# Excludes build artifacts, wrapper scripts, IDE files, and sensitive data
+
+# Build output
+target/
+build/
+
+# Maven wrapper files (NEVER include in Docker build)
+mvnw
+mvnw.cmd
+.mvn/
+
+# Gradle wrapper files (NEVER include in Docker build)
+gradlew
+gradlew.bat
+gradle/wrapper/
+
+# Version control
+.git/
+.gitignore
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+docs/
+
+# Test files
+src/test/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+
+# Scripts (not needed in container)
+scripts/
+
+# Kubernetes manifests (not needed in container)
+kubernetes/
+
+# Migration bundle
+migration-bundle/

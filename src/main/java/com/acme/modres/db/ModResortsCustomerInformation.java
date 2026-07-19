@@ -1,8 +1,7 @@
 package com.acme.modres.db;
 
+import javax.enterprise.context.ApplicationScoped;
 import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,8 +9,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+// Replaced EJB @Singleton/@Startup with CDI @ApplicationScoped to avoid EJB container
+// dependency and support horizontal scaling in containerized environments.
+// State is managed externally (e.g., Amazon ElastiCache/Redis) for consistency across replicas.
+@ApplicationScoped
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 

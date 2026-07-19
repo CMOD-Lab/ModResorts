@@ -5,7 +5,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.ibm.websphere.security.WSSecurityHelper;
+// Replaced IBM WebSphere-specific WSSecurityHelper with portable Jakarta EE HttpSession invalidation
 
 import java.io.IOException;
 
@@ -18,7 +18,10 @@ public class LogoutServlet extends HttpServlet {
       HttpServletResponse response) throws IOException {
 
     try {
-      WSSecurityHelper.revokeSSOCookies(request, response);
+      // Replaced WSSecurityHelper.revokeSSOCookies() with portable Jakarta EE session invalidation
+      if (request.getSession(false) != null) {
+        request.getSession(false).invalidate();
+      }
     } catch (Exception e) {
       System.err.println("[ERROR] Error logging out");
       e.printStackTrace();

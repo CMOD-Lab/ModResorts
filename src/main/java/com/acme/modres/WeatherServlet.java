@@ -250,29 +250,24 @@ public class WeatherServlet extends HttpServlet {
   }
 
   private String configureEnvDiscovery() {
-
+    // Replaced IBM WebSphere-specific com.ibm.websphere.runtime.ServerName with
+    // portable environment variable-based server identification
     String serverEnv = "";
-
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
-
+    serverEnv += System.getenv().getOrDefault("SERVER_DISPLAY_NAME", "unknown-server");
+    serverEnv += System.getenv().getOrDefault("SERVER_FULL_NAME", "unknown-server-full");
     return serverEnv;
   }
 
   private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
+    // Replaced IBM WebSphere-specific WsnInitialContextFactory and IIOP/CORBA
+    // RMI lookup with portable JNDI InitialContext using standard Java EE defaults.
+    // Service discovery is handled via Kubernetes DNS-based service endpoints.
     InitialContext ctx = null;
     try {
-      ctx = new InitialContext(ht);
+      ctx = new InitialContext();
     } catch (NamingException e) {
       e.printStackTrace();
     }
-
     return ctx;
   }
 }
