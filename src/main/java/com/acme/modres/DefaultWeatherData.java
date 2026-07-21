@@ -3,6 +3,7 @@ package com.acme.modres;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -79,7 +80,8 @@ public class DefaultWeatherData {
       inputStream = null;
     }
 
-    String resultStr = new String(out.toByteArray(), "UTF-8");
+    // Use StandardCharsets.UTF_8 instead of string literal "UTF-8" for type safety
+    String resultStr = new String(out.toByteArray(), StandardCharsets.UTF_8);
     logger.log(Level.FINEST, "resultStr: " + resultStr);
     out = null;
     return resultStr;
