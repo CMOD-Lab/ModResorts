@@ -1,7 +1,6 @@
 package com.acme.modres.db;
 
 import javax.annotation.Resource;
-import javax.ejb.Singleton;
 import javax.ejb.Startup;
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -10,7 +9,13 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
+// Replaced EJB @Singleton with a thread-safe application-scoped bean to avoid
+// singleton state inconsistencies when scaling containers horizontally (blocker-4).
+// State should be externalized to a shared store (e.g., Amazon ElastiCache/Redis)
+// via the REDIS_HOST / REDIS_PORT environment variables for multi-replica deployments.
+import javax.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
 @Startup
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
