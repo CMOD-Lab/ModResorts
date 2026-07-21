@@ -1,8 +1,6 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import org.springframework.stereotype.Service;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,8 +8,16 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+/**
+ * ModResortsCustomerInformation provides customer data access.
+ *
+ * Blocker-8 and Blocker-9 (cr-java-0085): Migrated from EJB 2.x (@Singleton, @Startup)
+ * to Spring Boot microservice pattern using @Service annotation.
+ * EJB container dependencies (javax.ejb.Singleton, javax.ejb.Startup) have been replaced
+ * with Spring Boot's @Service stereotype, enabling deployment on AWS managed services
+ * (ECS, EKS, Fargate) without requiring a heavyweight EJB container.
+ */
+@Service
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 

@@ -5,7 +5,11 @@
   <groupId>com.acme.modres</groupId>
   <artifactId>modresorts</artifactId>
   <version>2.0.0</version>
-  <packaging>war</packaging>
+  <!-- Blocker-15, Blocker-16 (cr-java-0107): Changed packaging from 'war' to 'jar'
+       to produce an executable JAR with embedded Tomcat via Spring Boot.
+       This enables container deployment on Amazon ECS, EKS, or AWS Fargate
+       without requiring an external application server. -->
+  <packaging>jar</packaging>
   <name>ModResorts</name>
   <properties>
     <maven.compiler.target>1.8</maven.compiler.target>
@@ -13,6 +17,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.version>2.0.0</project.version>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <aws.sdk.version>2.25.11</aws.sdk.version>
+    <spring.boot.version>2.7.18</spring.boot.version>
   </properties>
   <dependencies>
     <dependency>
@@ -21,12 +27,51 @@
       <version>7.0</version>
       <scope>provided</scope>
     </dependency>
+
+    <!-- Spring Boot Starter Web with embedded Tomcat (blocker-15, blocker-16) -->
     <dependency>
-      <groupId>com.ibm.websphere.appserver</groupId>
-      <artifactId>was_public</artifactId>
-      <version>9.0.0</version>
-      <scope>provided</scope>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <version>${spring.boot.version}</version>
     </dependency>
+
+    <!-- Spring Boot Starter for EJB-to-Spring migration (blocker-8, blocker-9) -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+      <version>${spring.boot.version}</version>
+    </dependency>
+
+    <!-- AWS SDK v2 BOM for consistent dependency management -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>bom</artifactId>
+      <version>${aws.sdk.version}</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+
+    <!-- AWS SDK v2 S3 client (blocker-1, blocker-2, blocker-3, blocker-4, blocker-6) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>${aws.sdk.version}</version>
+    </dependency>
+
+    <!-- AWS SDK v2 Secrets Manager client (blocker-7) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>secretsmanager</artifactId>
+      <version>${aws.sdk.version}</version>
+    </dependency>
+
+    <!-- AWS SDK v2 URL Connection HTTP client -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+      <version>${aws.sdk.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>com.google.code.gson</groupId>
       <artifactId>gson</artifactId>
@@ -57,28 +102,24 @@
       <scope>test</scope>
     </dependency>
 
-   
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
       <version>2.14.1</version>
     </dependency>
 
-   
     <dependency>
       <groupId>commons-collections</groupId>
       <artifactId>commons-collections</artifactId>
       <version>3.2.1</version>
     </dependency>
 
-    
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-webmvc</artifactId>
       <version>5.3.17</version>
     </dependency>
 
-   
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
@@ -88,20 +129,19 @@
   </dependencies>
   <build>
     <plugins>
+      <!-- Spring Boot Maven Plugin: produces executable JAR with embedded Tomcat
+           (blocker-15, blocker-16) replacing maven-war-plugin -->
       <plugin>
-        <artifactId>maven-war-plugin</artifactId>
-        <version>3.1.0</version>
-        <configuration>
-          <failOnMissingWebXml>false</failOnMissingWebXml>
-          <packagingExcludes>pom.xml, src/, target/, WebContent/</packagingExcludes>
-          <warSourceDirectory>WebContent</warSourceDirectory>
-          <webResources>
-            <resource>
-              <directory>src/main/resources</directory>
-              <targetPath>WEB-INF/classes</targetPath>
-            </resource>
-          </webResources>
-        </configuration>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring.boot.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
