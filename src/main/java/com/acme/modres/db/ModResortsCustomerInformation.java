@@ -1,19 +1,24 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import jakarta.annotation.Resource;
+import jakarta.ejb.Singleton;
+import jakarta.ejb.Startup;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.logging.Logger;
 
 @Singleton
 @Startup
 public class ModResortsCustomerInformation {
-  private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
+  // PostgreSQL-compatible query: use lowercase table/column names (snake_case)
+  // per PostgreSQL naming conventions
+  private static final String SELECT_CUSTOMERS_QUERY = "SELECT info FROM customer";
+
+  private static final Logger logger = Logger.getLogger(ModResortsCustomerInformation.class.getName());
 
   // Removing DB connection for ease of demo setup
   // @Resource(lookup = "jdbc/ModResortsJndi")
@@ -35,11 +40,12 @@ public class ModResortsCustomerInformation {
 
       // Process the results
       while (rs.next()) {
-        String info = rs.getString("INFO");
+        String info = rs.getString("info");
         customerInfo.add(info);
       }
 
     } catch (SQLException e) {
+      logger.severe("SQLException while fetching customer information: " + e.getMessage());
       e.printStackTrace();
     } finally {
       // Close the result set, statement, and connection
@@ -51,6 +57,7 @@ public class ModResortsCustomerInformation {
         if (conn != null)
           conn.close();
       } catch (SQLException e) {
+        logger.severe("SQLException while closing resources: " + e.getMessage());
         e.printStackTrace();
       }
     }

@@ -13,7 +13,6 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -259,19 +258,15 @@ public class WeatherServlet extends HttpServlet {
   }
 
   private InitialContext setInitialContextProps() {
-
-    Hashtable<String, String> ht = new Hashtable<>();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
+    // Replaced IBM WebSphere-specific WsnInitialContextFactory and CORBA IIOP
+    // naming context with standard Java EE JNDI InitialContext for
+    // PostgreSQL/standard container compatibility.
     InitialContext ctx = null;
     try {
-      ctx = new InitialContext(ht);
+      ctx = new InitialContext();
     } catch (NamingException e) {
-      e.printStackTrace();
+      logger.log(Level.WARNING, "Failed to create InitialContext: " + e.getMessage(), e);
     }
-
     return ctx;
   }
 }

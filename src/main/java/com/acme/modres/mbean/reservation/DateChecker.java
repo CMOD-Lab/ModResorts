@@ -17,6 +17,7 @@ public class DateChecker implements Runnable {
   }
 
   public void run() {
+    boolean isAvailable = true;
     for (int i = 0; i < reservations.size(); i++) {
       Reservation reservation = reservations.get(i);
       Date selectedDate = data.getSelectedDate();
@@ -25,13 +26,13 @@ public class DateChecker implements Runnable {
         Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
         Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
         if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
-          data.setAvailablility(false);
+          isAvailable = false;
           break;
         }
       } catch (ParseException ex) {
         ex.printStackTrace();
       }
     }
-    data.setAvailablility(true);
+    data.setAvailablility(isAvailable);
   }
 }
