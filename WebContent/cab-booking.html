@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="pikaday.css">
+    <link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600" rel="stylesheet">
+    <title>Book Transportation - MOD RESORTS</title>
+    <style>
+        .booking-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .booking-header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        .button-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        .btn-book,
+        .btn-cancel {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-book {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .btn-book:hover {
+            background-color: #45a049;
+        }
+        .btn-book:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-cancel {
+            background-color: #f44336;
+            color: white;
+        }
+        .btn-cancel:hover {
+            background-color: #da190b;
+        }
+        .error-message,
+        .success-message {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            display: none;
+        }
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef5350;
+        }
+        .success-message {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #66bb6a;
+        }
+        .ride-status {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            display: none;
+        }
+        .ride-status h3 {
+            margin-top: 0;
+        }
+        .status-detail {
+            margin: 10px 0;
+        }
+        .status-detail strong {
+            display: inline-block;
+            width: 150px;
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header--left-container">
+            <img class="header--logo" src="images/m-logo.svg" alt="">
+            <img class="resort-name--heading" src="images/mod-resort-name.svg" alt="">
+        </div>
+        <ul class="main-nav--list">
+            <li class="main-nav--list__item"><a href="index.html" style="color: white; text-decoration: none;">Home</a></li>
+            <li class="main-nav--list__item">Reservations</li>
+            <li class="main-nav--list__item">Reward Center</li>
+        </ul>
+    </header>
+
+    <main style="padding: 20px; min-height: 600px; background-color: #f9f9f9;">
+        <div class="booking-container">
+            <div class="booking-header">
+                <h1>Book Your Uber Ride</h1>
+                <p>Arrange transportation for your resort stay</p>
+            </div>
+
+            <div id="errorMessage" class="error-message"></div>
+            <div id="successMessage" class="success-message"></div>
+
+            <form id="cabBookingForm">
+                <div class="form-group">
+                    <label for="reservationId">Reservation ID *</label>
+                    <input type="text" id="reservationId" name="reservationId" readonly>
+                </div>
+
+                <div class="form-group">
+                    <label for="destination">Destination Address *</label>
+                    <input type="text" id="destination" name="destination"
+                           placeholder="Enter your destination address" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="pickupDate">Pickup Date (Optional)</label>
+                    <input type="text" id="pickupDate" name="pickupDate"
+                           placeholder="Select date for scheduled ride">
+                </div>
+
+                <div class="form-group">
+                    <label for="pickupTime">Pickup Time (Optional)</label>
+                    <input type="time" id="pickupTime" name="pickupTime">
+                </div>
+
+                <div class="form-group">
+                    <label for="rideType">Ride Type</label>
+                    <select id="rideType" name="rideType">
+                        <option value="uberX">UberX</option>
+                        <option value="uberXL">UberXL</option>
+                        <option value="uberBlack">Uber Black</option>
+                    </select>
+                </div>
+
+                <div class="button-container">
+                    <button type="submit" class="btn-book" id="bookButton">Request Uber</button>
+                    <button type="button" class="btn-cancel" onclick="window.location.href='index.html'">Cancel</button>
+                </div>
+            </form>
+
+            <div id="rideStatus" class="ride-status">
+                <h3>Ride Status</h3>
+                <div class="status-detail">
+                    <strong>Booking ID:</strong> <span id="statusBookingId"></span>
+                </div>
+                <div class="status-detail">
+                    <strong>Status:</strong> <span id="statusStatus"></span>
+                </div>
+                <div class="status-detail">
+                    <strong>ETA:</strong> <span id="statusEta"></span>
+                </div>
+                <div class="status-detail">
+                    <strong>Driver:</strong> <span id="statusDriver"></span>
+                </div>
+                <div class="status-detail">
+                    <strong>Vehicle:</strong> <span id="statusVehicle"></span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer" style="margin-top: 50px;">
+        <svg class="footer--logo" width="126px" height="126px" viewBox="0 0 126 126" version="1.1"
+            xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <defs>
+                <rect id="path-1" x="17" y="17" width="81" height="81"></rect>
+                <filter x="-12.3%" y="-9.9%" width="124.7%" height="124.7%" filterUnits="objectBoundingBox"
+                    id="filter-2">
+                    <feOffset dx="0" dy="2" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+                    <feGaussianBlur stdDeviation="3" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+                    <feComposite in="shadowBlurOuter1" in2="SourceAlpha" operator="out" result="shadowBlurOuter1">
+                    </feComposite>
+                    <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix"
+                        in="shadowBlurOuter1"></feColorMatrix>
+                </filter>
+            </defs>
+            <g id="Symbols" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <g id="M-Logo" transform="translate(7.000000, 4.000000)">
+                    <g>
+                        <g id="Rectangle-4"
+                            transform="translate(57.500000, 57.500000) rotate(45.000000) translate(-57.500000, -57.500000) ">
+                            <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+                            <rect stroke="#FFFFFF" stroke-width="5" stroke-linejoin="square" fill="#000000"
+                                fill-rule="evenodd" x="19.5" y="19.5" width="76" height="76"></rect>
+                        </g>
+                        <polygon id="M" fill="#FFFFFF"
+                            points="71.6855862 31.4937435 89.4509144 31.4937435 89.4509144 37.8919843 83.2568728 37.8919843 83.2568728 76.3835288 89.4509144 76.3835288 89.4509144 82.7817697 70.1540924 82.7817697 70.1540924 76.3835288 76.2120012 76.3835288 76.2120012 37.8919843 58.5828058 83.3263008 57.0513119 83.3263008 39.5582493 37.8919843 39.5582493 76.3835288 45.2077598 76.3835288 45.2077598 82.7817697 27 82.7817697 27 76.3835288 33.2280748 76.3835288 33.2280748 37.8919843 27 37.8919843 27 31.4937435 44.5951623 31.4937435 58.106341 66.6160016">
+                        </polygon>
+                    </g>
+                </g>
+            </g>
+        </svg>
+        <img class="resort-name--footer" src="images/mod-resort-name.svg" alt="">
+        <p class="footer-content">&copy; 2018 MOD RESORTS</p>
+    </footer>
+
+    <script src="lib/pikaday.js"></script>
+    <script src="cab-booking.js"></script>
+</body>
+
+</html>

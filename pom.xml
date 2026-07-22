@@ -137,6 +137,34 @@
       <version>2.15.2</version>
     </dependency>
 
+    <!-- Uber Rides Java SDK -->
+    <dependency>
+      <groupId>com.uber.sdk</groupId>
+      <artifactId>rides</artifactId>
+      <version>0.7.0</version>
+    </dependency>
+
+    <!-- Spring Security OAuth2 Client -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-client</artifactId>
+      <version>5.7.3</version>
+    </dependency>
+
+    <!-- Resilience4j Circuit Breaker -->
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-spring-boot2</artifactId>
+      <version>1.7.1</version>
+    </dependency>
+
+    <!-- Flyway Database Migrations -->
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+      <version>9.16.0</version>
+    </dependency>
+
   </dependencies>
 
   <build>

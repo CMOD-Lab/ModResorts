@@ -24,4 +24,17 @@ public class Constants {
 
   public final static String DATA_FORMAT = "MM/dd/yyyy";
 
+  // Uber API constants
+  public final static String UBER_API_BASE_URL = System.getenv("UBER_API_BASE_URL") != null
+      ? System.getenv("UBER_API_BASE_URL") : "https://api.uber.com";
+  public final static String UBER_AUTH_URL = System.getenv("UBER_AUTH_URL") != null
+      ? System.getenv("UBER_AUTH_URL") : "https://login.uber.com/oauth/v2/token";
+  public final static String DEFAULT_UBER_PRODUCT = "uberX";
+
+  // Resort location constants
+  public final static String RESORT_ADDRESS = "123 Resort Blvd, Las Vegas, NV 89109";
+  public final static double RESORT_LATITUDE = 36.1699;
+  public final static double RESORT_LONGITUDE = -115.1398;
+  public final static String RESORT_TIMEZONE = "America/Los_Angeles";
+
 }

@@ -283,7 +283,15 @@ function callRESTAPI() {
 function confirmReservcation() {
     if (city != null && city.innerHTML != "ERROR" && city.innerHTML != "") {
         if (toObject != null && fromObject != null) {
+            var reservationId = generateReservationId();
+            sessionStorage.setItem('currentReservationId', reservationId);
+
             alert("Your reservcation has been booked. We hope you enjoy your stay.");
+
+            var bookTransportBtn = document.getElementById('bookTransportBtn');
+            if (bookTransportBtn) {
+                bookTransportBtn.style.display = 'inline-block';
+            }
         } else {
             alert("Your reservation could not be booked as the selected time frame is currently unavailable. Please select a different timeframe.");
         }
@@ -296,6 +304,10 @@ function confirmReservcation() {
             alert("Please select a valid city.");
         }
     }
+}
+
+function generateReservationId() {
+    return 'RES-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 }
 
 function callAvailabilityChecker(dateObj, elem) {
