@@ -253,8 +253,12 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Replaced IBM WebSphere-specific com.ibm.websphere.runtime.ServerName.getDisplayName()
+    // with portable Jakarta EE / standard Java environment variable lookup
+    serverEnv += System.getenv().getOrDefault("SERVER_DISPLAY_NAME", "unknown-server");
+    // Replaced IBM WebSphere-specific com.ibm.websphere.runtime.ServerName.getFullName()
+    // with portable Jakarta EE / standard Java environment variable lookup
+    serverEnv += System.getenv().getOrDefault("SERVER_FULL_NAME", "unknown-cell/unknown-node/unknown-server");
 
     return serverEnv;
   }
@@ -263,8 +267,12 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // Replaced IBM WebSphere-specific WsnInitialContextFactory and corbaloc IIOP URL
+    // with portable JNDI default InitialContext (container-provided via ECS/EKS environment)
+    String jndiProviderUrl = System.getenv().getOrDefault("JNDI_PROVIDER_URL", "");
+    if (!jndiProviderUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiProviderUrl);
+    }
 
     InitialContext ctx = null;
     try {
