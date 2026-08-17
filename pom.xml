@@ -21,16 +21,18 @@
       <version>7.0</version>
       <scope>provided</scope>
     </dependency>
-    <dependency>
-      <groupId>com.ibm.websphere.appserver</groupId>
-      <artifactId>was_public</artifactId>
-      <version>9.0.0</version>
-      <scope>provided</scope>
-    </dependency>
+    <!-- blocker-1,2,6,7: Removed com.ibm.websphere.appserver:was_public (WebSphere server-specific dependency).
+         Replaced with portable Jakarta EE APIs and commons-text for HTML encoding. -->
     <dependency>
       <groupId>com.google.code.gson</groupId>
       <artifactId>gson</artifactId>
       <version>2.10.1</version>
+    </dependency>
+    <!-- blocker-2, blocker-7: Added commons-text to replace ResponseUtils.encodeDataString with portable HTML encoding -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <version>1.10.0</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

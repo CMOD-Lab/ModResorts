@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: modresorts
+  namespace: modresorts
+  labels:
+    app: modresorts
+    version: "2.0.0"
+    component: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: modresorts
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: modresorts
+        version: "2.0.0"
+        component: web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: modresorts
+          image: "{{IMAGE_URI}}"
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: TZ
+              value: "UTC"
+            - name: JAVA_OPTS
+              value: "-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UnlockExperimentalVMOptions"
+            - name: WEATHER_API_KEY
+              value: "{{WEATHER_API_KEY}}"
+            - name: SERVER_DISPLAY_NAME
+              value: "{{SERVER_DISPLAY_NAME}}"
+            - name: SERVER_FULL_NAME
+              value: "{{SERVER_FULL_NAME}}"
+            - name: JNDI_FACTORY
+              value: "{{JNDI_FACTORY}}"
+            - name: JNDI_PROVIDER_URL
+              value: "{{JNDI_PROVIDER_URL}}"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /resorts/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /resorts/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
