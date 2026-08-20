@@ -1,7 +1,7 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.sql.DataSource;
+import jakarta.annotation.Resource;
+import jakarta.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -14,8 +14,7 @@ import java.util.ArrayList;
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
-  // Removing DB connection for ease of demo setup
-  // @Resource(lookup = "jdbc/ModResortsJndi")
+  @Resource(lookup = "jdbc/ModResortsJndi")
   private DataSource dataSource;
 
   public ArrayList<String> getCustomerInformation() {

@@ -18,12 +18,12 @@ public class ZipValidator extends ZipFile {
 
   public boolean isValid() throws Throwable {
     if (file.exists()) {
-      ZipValidator zipFile = new ZipValidator(file);
-      Enumeration<? extends ZipEntry> entries = zipFile.entries();
-      if (!entries.hasMoreElements()) {
-        return true;
+      try (ZipValidator zipFile = new ZipValidator(file)) {
+        Enumeration<? extends ZipEntry> entries = zipFile.entries();
+        if (!entries.hasMoreElements()) {
+          return true;
+        }
       }
-      zipFile.close();
     }
     return false;
   }

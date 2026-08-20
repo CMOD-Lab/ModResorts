@@ -40,7 +40,7 @@ spec:
             - name: TZ
               value: "UTC"
             - name: JAVA_OPTS
-              value: "-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UnlockExperimentalVMOptions"
+              value: "-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
             - name: WEATHER_API_KEY
               value: "{{WEATHER_API_KEY}}"
             - name: SERVER_DISPLAY_NAME

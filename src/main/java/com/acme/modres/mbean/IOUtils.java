@@ -21,18 +21,23 @@ public final class IOUtils {
       initialStream.read(buffer);
 
       file = File.createTempFile(path, null);
+      // Mark temp file for deletion on JVM exit to prevent leak
+      file.deleteOnExit();
+
       outStream = new FileOutputStream(file);
       outStream.write(buffer);
       outStream.close();
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
+      // Fix resource closing logic - both should be checked independently
       if (initialStream != null) {
         try {
           initialStream.close();
         } catch (IOException e) {
         }
-      } else if (outStream != null) {
+      }
+      if (outStream != null) {
         try {
           outStream.close();
         } catch (IOException e) {

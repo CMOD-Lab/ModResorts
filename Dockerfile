@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: Builder
 # ============================================================
-FROM maven:3.8.6-openjdk-8-slim AS builder
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /workspace
 
@@ -21,7 +21,7 @@ RUN mvn clean package -DskipTests -B
 # ============================================================
 # Stage 2: Runtime
 # ============================================================
-FROM openjdk:8-jdk
+FROM eclipse-temurin:21-jdk
 
 LABEL maintainer="ModResorts Team" \
       application="modresorts" \
@@ -32,7 +32,7 @@ ENV TZ=UTC \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
-    JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UnlockExperimentalVMOptions" \
+    JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
     CATALINA_HOME=/opt/tomcat \
     WEATHER_API_KEY="" \
     SERVER_DISPLAY_NAME="modresorts-server" \
@@ -40,8 +40,8 @@ ENV TZ=UTC \
     JNDI_FACTORY="com.sun.jndi.fscontext.RefFSContextFactory" \
     JNDI_PROVIDER_URL=""
 
-# Install Tomcat 9 (supports Servlet 4.0 / Java EE 8)
-ENV TOMCAT_VERSION=9.0.82
+# Install Tomcat 11 (supports Jakarta Servlet 6.1 / Jakarta EE 10)
+ENV TOMCAT_VERSION=11.0.25
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tzdata \
     && rm -rf /var/lib/apt/lists/* \
@@ -51,7 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Download and install Tomcat
 RUN apt-get update && apt-get install -y --no-install-recommends wget \
-    && wget -q https://archive.apache.org/dist/tomcat/tomcat-9/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz -O /tmp/tomcat.tar.gz \
+    && wget -q https://archive.apache.org/dist/tomcat/tomcat-11/v${TOMCAT_VERSION}/bin/apache-tomcat-${TOMCAT_VERSION}.tar.gz -O /tmp/tomcat.tar.gz \
     && tar -xzf /tmp/tomcat.tar.gz -C /opt/tomcat --strip-components=1 \
     && rm /tmp/tomcat.tar.gz \
     && apt-get remove -y wget \

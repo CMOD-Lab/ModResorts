@@ -13,12 +13,12 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
-import javax.naming.InitialContext;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.naming.InitialContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import com.acme.modres.mbean.IOUtils;
 import com.acme.modres.mbean.reservation.DateChecker;
@@ -51,6 +51,23 @@ public class AvailabilityCheckerServlet extends HttpServlet {
     int statusCode = 200;
 
     String selectedDateStr = request.getParameter("date");
+
+    // Input validation for date parameter
+    if (selectedDateStr == null || selectedDateStr.trim().isEmpty()) {
+      response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+      response.setContentType("application/json");
+      response.getWriter().print("{\"error\":\"Date parameter is required\"}");
+      return;
+    }
+
+    // Validate date format to prevent injection
+    if (!selectedDateStr.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+      response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+      response.setContentType("application/json");
+      response.getWriter().print("{\"error\":\"Invalid date format. Expected yyyy-MM-dd\"}");
+      return;
+    }
+
     boolean parsedDate = reservationCheckerData.setSelectedDate(selectedDateStr);
     if (!parsedDate || reservationCheckerData.getReservationList() == null) {
       statusCode = 500;
