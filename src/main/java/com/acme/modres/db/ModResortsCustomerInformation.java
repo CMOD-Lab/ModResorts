@@ -1,8 +1,7 @@
 package com.acme.modres.db;
 
 import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import javax.enterprise.context.ApplicationScoped;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,8 +9,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+// Replaced EJB @Singleton/@Startup with CDI @ApplicationScoped for portable
+// container environments. EJB @Singleton creates container-managed state that
+// is inconsistent when scaling horizontally across multiple pods/containers.
+@ApplicationScoped
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 

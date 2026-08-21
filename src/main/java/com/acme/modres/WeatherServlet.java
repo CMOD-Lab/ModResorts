@@ -250,29 +250,29 @@ public class WeatherServlet extends HttpServlet {
   }
 
   private String configureEnvDiscovery() {
-
+    // Replaced WebSphere-specific com.ibm.websphere.runtime.ServerName with
+    // portable environment variable lookups for container environments
     String serverEnv = "";
-
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
-
+    serverEnv += System.getenv().getOrDefault("SERVER_DISPLAY_NAME", "");
+    serverEnv += System.getenv().getOrDefault("SERVER_FULL_NAME", "");
     return serverEnv;
   }
 
   private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
+    // Replaced WebSphere-specific WsnInitialContextFactory and IIOP/RMI corbaloc
+    // URL with standard JNDI InitialContext for portable container environments.
+    // Service discovery is handled via Kubernetes DNS / environment variables.
+    Hashtable<String, String> ht = new Hashtable<>();
+    String jndiProviderUrl = System.getenv().getOrDefault("JNDI_PROVIDER_URL", "");
+    if (!jndiProviderUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiProviderUrl);
+    }
     InitialContext ctx = null;
     try {
-      ctx = new InitialContext(ht);
+      ctx = new InitialContext(ht.isEmpty() ? null : ht);
     } catch (NamingException e) {
       e.printStackTrace();
     }
-
     return ctx;
   }
 }

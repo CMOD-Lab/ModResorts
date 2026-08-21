@@ -1,0 +1,81 @@
+{
+  "family": "modresorts-task",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "modresorts",
+      "image": "{{IMAGE_URI}}",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 9080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "JAVA_OPTS",
+          "value": "-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UnlockExperimentalVMOptions -Djava.security.egd=file:/dev/./urandom"
+        },
+        {
+          "name": "TZ",
+          "value": "UTC"
+        },
+        {
+          "name": "APP_ENV",
+          "value": "production"
+        },
+        {
+          "name": "DB_HOST",
+          "value": "{{DB_HOST}}"
+        },
+        {
+          "name": "DB_PORT",
+          "value": "5432"
+        },
+        {
+          "name": "DB_NAME",
+          "value": "modresorts"
+        },
+        {
+          "name": "WEATHER_API_URL",
+          "value": "{{WEATHER_API_URL}}"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DB_USER",
+          "valueFrom": "arn:aws:secretsmanager:{{AWS_REGION}}:{{ACCOUNT_ID}}:secret:modresorts/db-credentials:username::"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:{{AWS_REGION}}:{{ACCOUNT_ID}}:secret:modresorts/db-credentials:password::"
+        },
+        {
+          "name": "WEATHER_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:{{AWS_REGION}}:{{ACCOUNT_ID}}:secret:modresorts/weather-api-key::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/modresorts",
+          "awslogs-region": "{{AWS_REGION}}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "ulimits": [
+        {
+          "name": "nofile",
+          "softLimit": 65536,
+          "hardLimit": 65536
+        }
+      ]
+    }
+  ]
+}
