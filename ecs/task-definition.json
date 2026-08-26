@@ -1,0 +1,40 @@
+{
+  "family": "modresorts-task",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "modresorts",
+      "image": "{{IMAGE_URI}}",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 9080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "TZ",                  "value": "UTC" },
+        { "name": "JAVA_OPTS",           "value": "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=UTC" },
+        { "name": "JVM_ARGS",            "value": "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Xmx512m" },
+        { "name": "WEATHER_API_KEY",     "value": "" },
+        { "name": "JNDI_FACTORY",        "value": "" },
+        { "name": "JNDI_PROVIDER_URL",   "value": "" },
+        { "name": "SERVER_DISPLAY_NAME", "value": "ModResorts" },
+        { "name": "SERVER_FULL_NAME",    "value": "ModResorts/defaultServer" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/modresorts",
+          "awslogs-region":        "{{AWS_REGION}}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

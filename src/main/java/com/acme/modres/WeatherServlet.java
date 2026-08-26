@@ -250,29 +250,36 @@ public class WeatherServlet extends HttpServlet {
   }
 
   private String configureEnvDiscovery() {
-
+    // Replaced com.ibm.websphere.runtime.ServerName.getDisplayName() and
+    // com.ibm.websphere.runtime.ServerName.getFullName() with portable
+    // environment variable lookups to remove WebSphere-specific runtime API
     String serverEnv = "";
-
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
-
+    String serverDisplayName = System.getenv("SERVER_DISPLAY_NAME");
+    String serverFullName = System.getenv("SERVER_FULL_NAME");
+    serverEnv += (serverDisplayName != null ? serverDisplayName : "");
+    serverEnv += (serverFullName != null ? serverFullName : "");
     return serverEnv;
   }
 
   private InitialContext setInitialContextProps() {
-
+    // Replaced WebSphere-specific WsnInitialContextFactory and IIOP/RMI
+    // corbaloc URL with portable JNDI InitialContext using standard
+    // environment variables for container-friendly service discovery
     Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
+    String jndiFactory = System.getenv("JNDI_FACTORY");
+    String jndiProviderUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    if (jndiProviderUrl != null && !jndiProviderUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiProviderUrl);
+    }
     InitialContext ctx = null;
     try {
-      ctx = new InitialContext(ht);
+      ctx = new InitialContext(ht.isEmpty() ? null : ht);
     } catch (NamingException e) {
       e.printStackTrace();
     }
-
     return ctx;
   }
 }

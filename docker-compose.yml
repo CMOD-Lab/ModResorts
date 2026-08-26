@@ -1,0 +1,43 @@
+# ModResorts – Docker Compose (application only)
+# External services (DB, cache, etc.) are provided separately via env vars.
+
+version: "3.9"
+
+services:
+  modresorts:
+    image: modresorts:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: modresorts-app
+    ports:
+      - "9080:9080"
+    environment:
+      # JVM tuning
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=UTC
+      - JVM_ARGS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Xmx512m
+      # Application profile
+      - TZ=UTC
+      # Weather API (optional – leave blank to use default data)
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      # JNDI (optional – leave blank for default context)
+      - JNDI_FACTORY=${JNDI_FACTORY:-}
+      - JNDI_PROVIDER_URL=${JNDI_PROVIDER_URL:-}
+      # Server identity (optional)
+      - SERVER_DISPLAY_NAME=${SERVER_DISPLAY_NAME:-ModResorts}
+      - SERVER_FULL_NAME=${SERVER_FULL_NAME:-ModResorts/defaultServer}
+    volumes:
+      - ./logs:/opt/liberty/usr/servers/defaultServer/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9080/resorts/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+networks:
+  app-network:
+    driver: bridge

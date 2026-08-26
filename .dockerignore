@@ -1,0 +1,63 @@
+# ModResorts – .dockerignore
+# Excludes build artifacts, IDE files, wrapper scripts, and other non-essential files
+
+# Maven build output
+target/
+
+# Maven wrapper (NEVER used inside Docker – system mvn is used instead)
+mvnw
+mvnw.cmd
+.mvn/
+
+# Gradle wrapper (not used in this project but excluded for safety)
+gradlew
+gradlew.bat
+gradle/
+build.gradle.hideme
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+*.swp
+*.swo
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+LICENSE
+CODEOWNERS
+CONTRIBUTING.md
+
+# CI / CD
+.github/
+.travis.yml
+Jenkinsfile
+
+# Logs
+logs/
+*.log
+
+# Migration bundle (not needed at runtime)
+migration-bundle/
+
+# Docker files themselves (avoid recursive context)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Test reports
+surefire-reports/
