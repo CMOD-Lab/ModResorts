@@ -253,8 +253,10 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Replaced com.ibm.websphere.runtime.ServerName.getDisplayName() and getFullName()
+    // with environment variables for container-compatible server identification
+    serverEnv += System.getenv().getOrDefault("SERVER_DISPLAY_NAME", "");
+    serverEnv += System.getenv().getOrDefault("SERVER_FULL_NAME", "");
 
     return serverEnv;
   }
@@ -263,8 +265,10 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // Replaced WebSphere-specific WsnInitialContextFactory and corbaloc IIOP URL
+    // with standard JNDI initial context factory for container compatibility
+    ht.put("java.naming.factory.initial", System.getenv().getOrDefault("JNDI_FACTORY", "com.sun.jndi.rmi.registry.RegistryContextFactory"));
+    ht.put("java.naming.provider.url", System.getenv().getOrDefault("JNDI_PROVIDER_URL", "rmi://localhost:1099"));
 
     InitialContext ctx = null;
     try {
