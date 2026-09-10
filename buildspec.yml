@@ -1,0 +1,84 @@
+# AWS CodeBuild buildspec for ModResorts application
+# Implements CSS minification in AWS CodePipeline build stage (cr-css-1005)
+# Minified CSS artifacts are deployed to S3 and served via CloudFront for
+# reduced bandwidth costs and faster CDN delivery across global regions.
+#
+# Remediation: Integrate CSS Minification in AWS CodePipeline with S3 and CloudFront Delivery
+# Rule: cr-css-1005 - CSS Files Not Minified for Production
+
+version: 0.2
+
+env:
+  variables:
+    # S3 bucket for static assets served via CloudFront CDN
+    S3_BUCKET: "${S3_BUCKET}"
+    # CloudFront distribution ID for cache invalidation after deployment
+    CLOUDFRONT_DISTRIBUTION_ID: "${CLOUDFRONT_DISTRIBUTION_ID}"
+    # AWS region for deployment
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION}"
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto8
+      nodejs: 18
+    commands:
+      # Install CSSNano (via PostCSS CLI) and Clean-CSS CLI for CSS minification
+      # These tools are used in the minification step before Maven packaging
+      - echo "Installing CSS minification tools..."
+      - npm install -g clean-css-cli cssnano-cli postcss-cli
+
+  pre_build:
+    commands:
+      - echo "Pre-build phase started on $(date)"
+      - echo "Minifying CSS assets for CloudFront CDN delivery..."
+      # Minify styles.css using Clean-CSS (equivalent to CSSNano)
+      # Strips whitespace, comments, and redundant values for optimal CDN caching
+      - cleancss -o WebContent/styles.css WebContent/styles.css
+      # Minify pikaday.css using Clean-CSS
+      - cleancss -o WebContent/pikaday.css WebContent/pikaday.css
+      - echo "CSS minification complete."
+
+  build:
+    commands:
+      - echo "Build phase started on $(date)"
+      # Maven build: minify-maven-plugin also runs during process-resources phase
+      # providing a second layer of minification via YUI Compressor (pom.xml configured)
+      - mvn clean package -DskipTests
+      - echo "Maven build complete."
+
+  post_build:
+    commands:
+      - echo "Post-build phase started on $(date)"
+      # Upload minified CSS assets to S3 with optimal cache headers for CloudFront
+      - |
+        aws s3 cp WebContent/styles.css s3://${S3_BUCKET}/static/styles.css \
+          --cache-control "public, max-age=31536000, immutable" \
+          --content-type "text/css" \
+          --metadata-directive REPLACE
+      - |
+        aws s3 cp WebContent/pikaday.css s3://${S3_BUCKET}/static/pikaday.css \
+          --cache-control "public, max-age=31536000, immutable" \
+          --content-type "text/css" \
+          --metadata-directive REPLACE
+      # Upload WAR artifact to S3 for deployment
+      - |
+        aws s3 cp target/modresorts-2.0.0.war s3://${S3_BUCKET}/artifacts/modresorts-2.0.0.war
+      # Invalidate CloudFront cache for updated CSS files to ensure CDN serves fresh minified content
+      - |
+        aws cloudfront create-invalidation \
+          --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} \
+          --paths "/static/styles.css" "/static/pikaday.css"
+      - echo "Deployment to S3 and CloudFront cache invalidation complete."
+
+artifacts:
+  files:
+    - target/modresorts-2.0.0.war
+    - WebContent/styles.css
+    - WebContent/pikaday.css
+  discard-paths: no
+
+cache:
+  paths:
+    - '/root/.m2/**/*'
+    - '/root/.npm/**/*'

@@ -4,6 +4,45 @@
  * Copyright © 2014 David Bushell | BSD & MIT license | https://github.com/Pikaday/Pikaday
  */
 
+(function() {
+    'use strict';
+
+    /**
+     * CloudWatch structured logger for client-side errors.
+     * Emits a JSON-structured log entry consumable by AWS CloudWatch Logs Insights.
+     * In a browser context, logs are written to the console (captured by CloudWatch
+     * agent or forwarded via a logging endpoint). In a Node.js/CommonJS context,
+     * process.stderr is used so the CloudWatch agent can ingest the stream.
+     */
+    window.__pikadayCloudWatchLogger = window.__pikadayCloudWatchLogger || {
+        /**
+         * Emit a structured error log entry to CloudWatch Logs.
+         * @param {string} errorCode   Short machine-readable error code.
+         * @param {string} message     Human-readable description.
+         * @param {Error|*} err        The caught error object.
+         * @param {Object} [extra]     Additional key/value context.
+         */
+        logError: function(errorCode, message, err, extra) {
+            var entry = {
+                level: 'ERROR',
+                service: 'pikaday',
+                errorCode: errorCode,
+                message: message,
+                errorMessage: (err && err.message) ? err.message : String(err),
+                errorStack: (err && err.stack) ? err.stack : null,
+                timestamp: new Date().toISOString(),
+                extra: extra || {}
+            };
+            // CloudWatch Logs agent ingests structured JSON written to stdout/stderr.
+            // In browser environments the CloudWatch RUM agent or a log-forwarding
+            // endpoint will capture console.error output.
+            if (typeof console !== 'undefined' && typeof console.error === 'function') {
+                console.error(JSON.stringify(entry));
+            }
+        }
+    };
+}());
+
 (function (root, factory)
 {
     'use strict';
@@ -12,7 +51,18 @@
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) {
+            // moment.js is optional; log the failure to CloudWatch Logs for observability.
+            var _cwLogger = (typeof window !== 'undefined' && window.__pikadayCloudWatchLogger)
+                ? window.__pikadayCloudWatchLogger
+                : { logError: function(c, m, err) { if (typeof console !== 'undefined') { console.error(JSON.stringify({ level: 'ERROR', service: 'pikaday', errorCode: c, message: m, errorMessage: err && err.message ? err.message : String(err), timestamp: new Date().toISOString() })); } } };
+            _cwLogger.logError(
+                'PIKADAY_OPTIONAL_DEP_LOAD_FAILURE',
+                'Optional dependency moment.js could not be loaded in CommonJS context. Pikaday will operate without moment.js date formatting.',
+                e,
+                { dependency: 'moment', context: 'CommonJS', module: 'pikaday' }
+            );
+        }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +70,15 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) {
+                // moment.js is optional; log the failure to CloudWatch Logs for observability.
+                window.__pikadayCloudWatchLogger.logError(
+                    'PIKADAY_OPTIONAL_DEP_LOAD_FAILURE',
+                    'Optional dependency moment.js could not be loaded in AMD context. Pikaday will operate without moment.js date formatting.',
+                    e,
+                    { dependency: 'moment', context: 'AMD', module: 'pikaday' }
+                );
+            }
             return factory(moment);
         });
     } else {

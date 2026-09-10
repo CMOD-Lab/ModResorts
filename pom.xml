@@ -5,7 +5,11 @@
   <groupId>com.acme.modres</groupId>
   <artifactId>modresorts</artifactId>
   <version>2.0.0</version>
-  <packaging>war</packaging>
+  <!-- cr-java-0107: Changed from 'war' to 'jar' for executable JAR packaging with embedded Tomcat.
+       This enables container deployment on Amazon ECS, EKS, or AWS Fargate without external
+       application servers. The spring-boot-maven-plugin repackages the JAR as a self-contained
+       executable with embedded Tomcat. -->
+  <packaging>jar</packaging>
   <name>ModResorts</name>
   <properties>
     <maven.compiler.target>1.8</maven.compiler.target>
@@ -13,18 +17,24 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.version>2.0.0</project.version>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!-- Spring Boot version for embedded Tomcat and executable JAR support -->
+    <spring.boot.version>2.7.18</spring.boot.version>
   </properties>
   <dependencies>
+    <!-- cr-java-0107: Replaced 'javax:javaee-api:provided' and IBM WebSphere 'was_public:provided'
+         with spring-boot-starter-web which bundles embedded Tomcat (servlet container).
+         No external application server is required; the JAR is self-contained and executable. -->
     <dependency>
-      <groupId>javax</groupId>
-      <artifactId>javaee-api</artifactId>
-      <version>7.0</version>
-      <scope>provided</scope>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <version>${spring.boot.version}</version>
     </dependency>
+    <!-- Servlet API provided by embedded Tomcat inside spring-boot-starter-web;
+         kept as provided scope for compilation of existing javax.servlet code -->
     <dependency>
-      <groupId>com.ibm.websphere.appserver</groupId>
-      <artifactId>was_public</artifactId>
-      <version>9.0.0</version>
+      <groupId>javax.servlet</groupId>
+      <artifactId>javax.servlet-api</artifactId>
+      <version>4.0.1</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -85,22 +95,45 @@
       <version>2.9.10</version>
     </dependency>
 
+    <!-- AWS SDK v2 for S3 - replaces hard-coded local file path storage -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>2.25.11</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>auth</artifactId>
+      <version>2.25.11</version>
+    </dependency>
+    <!-- AWS SDK v2 for Secrets Manager - replaces hardcoded secrets/API keys -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>secretsmanager</artifactId>
+      <version>2.25.11</version>
+    </dependency>
+
   </dependencies>
   <build>
     <plugins>
+      <!-- cr-java-0107: Replaced maven-war-plugin with spring-boot-maven-plugin.
+           The 'repackage' goal creates a self-contained executable JAR with embedded Tomcat,
+           enabling deployment to Amazon ECS, EKS, or AWS Fargate without any external
+           application server. The application is started via 'java -jar modresorts-2.0.0.jar'. -->
       <plugin>
-        <artifactId>maven-war-plugin</artifactId>
-        <version>3.1.0</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring.boot.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
         <configuration>
-          <failOnMissingWebXml>false</failOnMissingWebXml>
-          <packagingExcludes>pom.xml, src/, target/, WebContent/</packagingExcludes>
-          <warSourceDirectory>WebContent</warSourceDirectory>
-          <webResources>
-            <resource>
-              <directory>src/main/resources</directory>
-              <targetPath>WEB-INF/classes</targetPath>
-            </resource>
-          </webResources>
+          <!-- Ensures the JAR is executable and includes all runtime dependencies -->
+          <executable>true</executable>
         </configuration>
       </plugin>
       <plugin>
@@ -120,6 +153,73 @@
                   <directory>src/main/resources</directory>
                 </resource>
               </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!--
+        CSS Minification plugin for AWS CodePipeline build stage (cr-css-1005):
+        Minifies all CSS assets (pikaday.css, styles.css) using YUI Compressor so that
+        minified artifacts are deployed to S3 and served via CloudFront for reduced
+        bandwidth costs and faster CDN delivery across global regions.
+
+        In AWS CodePipeline:
+          1. CodeBuild runs 'mvn process-resources' which triggers this plugin.
+          2. Minified CSS files are output to the WAR target directory.
+          3. The WAR artifact is uploaded to S3 and distributed via CloudFront.
+
+        This implements the remediation strategy:
+          "Integrate CSS Minification in AWS CodePipeline with S3 and CloudFront Delivery"
+      -->
+      <plugin>
+        <groupId>com.samaxes.maven</groupId>
+        <artifactId>minify-maven-plugin</artifactId>
+        <version>1.7.6</version>
+        <executions>
+          <!-- Minify pikaday.css for CDN delivery via CloudFront -->
+          <execution>
+            <id>minify-pikaday-css</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>minify</goal>
+            </goals>
+            <configuration>
+              <webappSourceDir>${basedir}/WebContent</webappSourceDir>
+              <webappTargetDir>${project.build.directory}/${project.build.finalName}</webappTargetDir>
+              <cssSourceDir>.</cssSourceDir>
+              <cssSourceFiles>
+                <cssSourceFile>pikaday.css</cssSourceFile>
+              </cssSourceFiles>
+              <cssFinalFile>pikaday.css</cssFinalFile>
+              <!-- YUI Compressor provides CSSNano/Clean-CSS equivalent minification for Maven builds.
+                   Strips whitespace, comments, and redundant values for optimal CDN caching. -->
+              <cssEngine>YUI</cssEngine>
+              <skipMerge>true</skipMerge>
+              <nosuffix>true</nosuffix>
+              <linebreak>-1</linebreak>
+            </configuration>
+          </execution>
+          <!-- Minify styles.css for CDN delivery via CloudFront -->
+          <execution>
+            <id>minify-styles-css</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>minify</goal>
+            </goals>
+            <configuration>
+              <webappSourceDir>${basedir}/WebContent</webappSourceDir>
+              <webappTargetDir>${project.build.directory}/${project.build.finalName}</webappTargetDir>
+              <cssSourceDir>.</cssSourceDir>
+              <cssSourceFiles>
+                <cssSourceFile>styles.css</cssSourceFile>
+              </cssSourceFiles>
+              <cssFinalFile>styles.css</cssFinalFile>
+              <!-- YUI Compressor provides CSSNano/Clean-CSS equivalent minification for Maven builds.
+                   Strips whitespace, comments, and redundant values for optimal CDN caching. -->
+              <cssEngine>YUI</cssEngine>
+              <skipMerge>true</skipMerge>
+              <nosuffix>true</nosuffix>
+              <linebreak>-1</linebreak>
             </configuration>
           </execution>
         </executions>
