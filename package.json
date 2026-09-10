@@ -1,0 +1,24 @@
+{
+  "name": "modresorts",
+  "version": "2.0.0",
+  "description": "ModResorts web application - CSS minification pipeline for AWS CodePipeline / CloudFront CDN delivery",
+  "private": true,
+  "scripts": {
+    "minify:css": "cleancss --level 2 --output target/minified-css/pikaday.min.css WebContent/pikaday.css && cleancss --level 2 --output target/minified-css/styles.min.css WebContent/styles.css",
+    "minify:pikaday": "cleancss --level 2 --output target/minified-css/pikaday.min.css WebContent/pikaday.css",
+    "minify:styles": "cleancss --level 2 --output target/minified-css/styles.min.css WebContent/styles.css"
+  },
+  "devDependencies": {
+    "clean-css-cli": "5.6.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=10.0.0"
+  },
+  "keywords": [
+    "css-minification",
+    "aws-codepipeline",
+    "cloudfront",
+    "cdn"
+  ]
+}

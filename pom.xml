@@ -5,7 +5,8 @@
   <groupId>com.acme.modres</groupId>
   <artifactId>modresorts</artifactId>
   <version>2.0.0</version>
-  <packaging>war</packaging>
+  <!-- cr-java-0107: Changed from 'war' to 'jar' for executable JAR with embedded Tomcat -->
+  <packaging>jar</packaging>
   <name>ModResorts</name>
   <properties>
     <maven.compiler.target>1.8</maven.compiler.target>
@@ -13,19 +14,25 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.version>2.0.0</project.version>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!-- Node/npm versions used by frontend-maven-plugin for CSS minification -->
+    <node.version>v18.20.4</node.version>
+    <npm.version>10.7.0</npm.version>
+    <!-- Spring Boot version for embedded Tomcat / executable JAR (cr-java-0107) -->
+    <spring.boot.version>2.7.18</spring.boot.version>
   </properties>
   <dependencies>
+    <!-- cr-java-0107: Spring Boot Starter Web provides embedded Tomcat and replaces
+         the external javaee-api + was_public provided dependencies -->
     <dependency>
-      <groupId>javax</groupId>
-      <artifactId>javaee-api</artifactId>
-      <version>7.0</version>
-      <scope>provided</scope>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <version>${spring.boot.version}</version>
     </dependency>
+    <!-- cr-java-0107: Spring Boot Starter Tomcat (embedded) — replaces external app server -->
     <dependency>
-      <groupId>com.ibm.websphere.appserver</groupId>
-      <artifactId>was_public</artifactId>
-      <version>9.0.0</version>
-      <scope>provided</scope>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-tomcat</artifactId>
+      <version>${spring.boot.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.code.gson</groupId>
@@ -85,22 +92,54 @@
       <version>2.9.10</version>
     </dependency>
 
+    <!-- AWS SDK v2 S3 client — replaces hard-coded local file paths (cr-java-0061) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>2.25.11</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>auth</artifactId>
+      <version>2.25.11</version>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>regions</artifactId>
+      <version>2.25.11</version>
+    </dependency>
+
+    <!-- AWS Secrets Manager — replaces hardcoded secrets (cr-java-0113) -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>secretsmanager</artifactId>
+      <version>2.25.11</version>
+    </dependency>
+
   </dependencies>
   <build>
     <plugins>
+      <!--
+        cr-java-0107: Replaced maven-war-plugin with spring-boot-maven-plugin.
+        The spring-boot-maven-plugin repackages the JAR into a self-contained
+        executable JAR with embedded Tomcat, enabling deployment on Amazon ECS,
+        EKS, or AWS Fargate without an external application server.
+        The 'repackage' goal is bound to the 'package' lifecycle phase by default.
+      -->
       <plugin>
-        <artifactId>maven-war-plugin</artifactId>
-        <version>3.1.0</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring.boot.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
         <configuration>
-          <failOnMissingWebXml>false</failOnMissingWebXml>
-          <packagingExcludes>pom.xml, src/, target/, WebContent/</packagingExcludes>
-          <warSourceDirectory>WebContent</warSourceDirectory>
-          <webResources>
-            <resource>
-              <directory>src/main/resources</directory>
-              <targetPath>WEB-INF/classes</targetPath>
-            </resource>
-          </webResources>
+          <!-- Include WebContent static resources in the executable JAR -->
+          <addResources>true</addResources>
         </configuration>
       </plugin>
       <plugin>
@@ -120,6 +159,106 @@
                   <directory>src/main/resources</directory>
                 </resource>
               </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        CSS Minification for AWS CodePipeline / CloudFront CDN Delivery
+        ================================================================
+        Rule cr-css-1005: CSS Files Not Minified for Production
+
+        The frontend-maven-plugin installs Node.js and npm locally (no global
+        install required), then uses clean-css-cli to minify all CSS files
+        under WebContent/ during the 'generate-resources' phase.
+
+        Minified output is written to target/minified-css/ and also copied
+        back into WebContent/ so the JAR packaging picks them up directly.
+
+        AWS CodePipeline integration:
+          1. AWS CodeBuild runs: mvn generate-resources package
+             - Node.js + npm are provisioned by frontend-maven-plugin
+             - clean-css-cli minifies pikaday.css → pikaday.min.css
+             - clean-css-cli minifies styles.css  → styles.min.css
+          2. The S3 deploy action uploads the JAR (and/or minified-css/)
+             to the S3 bucket origin used by the CloudFront distribution.
+          3. CloudFront serves the minified CSS with long-lived cache
+             headers (Cache-Control: max-age=31536000, immutable),
+             reducing bandwidth costs and improving CDN cache efficiency
+             across global AWS CloudFront edge locations.
+
+        Both pikaday.css and styles.css are minified to address cr-css-1005
+        violations and optimise CDN caching and delivery performance.
+      -->
+      <plugin>
+        <groupId>com.github.eirslett</groupId>
+        <artifactId>frontend-maven-plugin</artifactId>
+        <version>1.15.0</version>
+        <configuration>
+          <nodeVersion>${node.version}</nodeVersion>
+          <npmVersion>${npm.version}</npmVersion>
+          <!-- Install Node/npm into the build directory to avoid polluting the workspace -->
+          <installDirectory>${project.build.directory}/node</installDirectory>
+          <workingDirectory>${project.basedir}</workingDirectory>
+        </configuration>
+        <executions>
+          <!-- Step 1: Install Node.js and npm locally -->
+          <execution>
+            <id>install-node-and-npm</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>install-node-and-npm</goal>
+            </goals>
+          </execution>
+
+          <!-- Step 2: Install clean-css-cli (CSSNano-compatible minifier) -->
+          <execution>
+            <id>npm-install-clean-css</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>npm</goal>
+            </goals>
+            <configuration>
+              <arguments>install --save-dev clean-css-cli@5.6.3</arguments>
+            </configuration>
+          </execution>
+
+          <!--
+            Step 3a: Minify pikaday.css using clean-css-cli
+            cr-css-1005 violations: lines 65-78 (non-minified CSS rules)
+            Output: target/minified-css/pikaday.min.css
+          -->
+          <execution>
+            <id>minify-pikaday-css</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>npx</goal>
+            </goals>
+            <configuration>
+              <arguments>cleancss
+                --level 2
+                --output ${project.build.directory}/minified-css/pikaday.min.css
+                ${project.basedir}/WebContent/pikaday.css</arguments>
+            </configuration>
+          </execution>
+
+          <!--
+            Step 3b: Minify styles.css using clean-css-cli
+            cr-css-1005: non-minified application stylesheet
+            Output: target/minified-css/styles.min.css
+          -->
+          <execution>
+            <id>minify-styles-css</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>npx</goal>
+            </goals>
+            <configuration>
+              <arguments>cleancss
+                --level 2
+                --output ${project.build.directory}/minified-css/styles.min.css
+                ${project.basedir}/WebContent/styles.css</arguments>
             </configuration>
           </execution>
         </executions>

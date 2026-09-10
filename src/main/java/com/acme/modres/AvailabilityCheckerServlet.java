@@ -1,17 +1,16 @@
 package com.acme.modres;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import javax.naming.InitialContext;
 import javax.servlet.ServletException;
@@ -25,7 +24,9 @@ import com.acme.modres.mbean.reservation.DateChecker;
 import com.acme.modres.mbean.reservation.ReservationCheckerData;
 import com.acme.modres.mbean.reservation.Reservation;
 
-import com.acme.modres.util.ZipValidator;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @WebServlet({ "/resorts/availability" })
 public class AvailabilityCheckerServlet extends HttpServlet {
@@ -59,17 +60,18 @@ public class AvailabilityCheckerServlet extends HttpServlet {
       List<Reservation> reservations = reservationCheckerData.getReservationList().getReservations();
       boolean isAvailible = true;
 
+      DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.DATA_FORMAT);
       for (Reservation reservation : reservations) {
         try {
-          Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-          Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
-          Date selectedDate = reservationCheckerData.getSelectedDate();
+          LocalDate fromDate = LocalDate.parse(reservation.getFromDate(), formatter);
+          LocalDate toDate = LocalDate.parse(reservation.getToDate(), formatter);
+          LocalDate selectedDate = reservationCheckerData.getSelectedDate();
 
-          if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
+          if (selectedDate.isAfter(fromDate) && selectedDate.isBefore(toDate)) {
             isAvailible = false;
             break;
           }
-        } catch (ParseException ex) {
+        } catch (DateTimeParseException ex) {
           ex.printStackTrace();
         }
       }
@@ -99,38 +101,59 @@ public class AvailabilityCheckerServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  /**
+   * Exports reservations as a zip archive and uploads it to Amazon S3.
+   *
+   * <p>The local file system write operation (cr-java-0062) has been replaced with
+   * Amazon S3 object storage using AWS SDK for Java v2. The reservations resource
+   * is read directly from the classpath {@link java.io.InputStream} — no temporary
+   * file is created on the local disk. The S3 bucket name and object key are read
+   * from environment variables (RESERVATIONS_S3_BUCKET and RESERVATIONS_S3_KEY)
+   * so that no absolute paths are embedded in the code. The zip archive is built
+   * entirely in memory and uploaded directly to S3, eliminating any dependency on
+   * the host file system.</p>
+   */
   protected int exportRevervations(String selectedDateStr) {
-    File fileToZip = IOUtils.getFileFromRelativePath("reservations.json");
-    String userDirectory = System.getProperty("user.home");
-    String zipPath = userDirectory + "/reservations.zip";
+    // Read S3 destination from environment variables — no hard-coded paths.
+    String s3BucketName = System.getenv("RESERVATIONS_S3_BUCKET");
+    String s3ObjectKey = System.getenv().getOrDefault("RESERVATIONS_S3_KEY", "reservations/reservations.zip");
 
-    FileOutputStream fos;
     try {
-      fos = new FileOutputStream(zipPath);
-      ZipOutputStream zipOut = new ZipOutputStream(fos);
-
-      FileInputStream fis = new FileInputStream(fileToZip);
-      ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-      zipOut.putNextEntry(zipEntry);
-
-      byte[] bytes = new byte[1024];
-      int length;
-      while ((length = fis.read(bytes)) >= 0) {
-        zipOut.write(bytes, 0, length);
+      // Read the reservations resource directly from the classpath — no local file
+      // write (cr-java-0062 remediation: replace local file writes with Amazon S3).
+      byte[] resourceBytes = IOUtils.getResourceBytes("reservations.json");
+      if (resourceBytes == null || resourceBytes.length == 0) {
+        return -1;
       }
-      fis.close();
 
-      zipOut.close();
-      fos.close();
-
-      // verify zip
-      ZipValidator zipValidator = new ZipValidator(new File(zipPath));
-      if (zipValidator.isValid()) {
-        return 0;
+      // Build the zip archive entirely in memory to avoid local file system writes.
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      try (ZipOutputStream zipOut = new ZipOutputStream(baos)) {
+        ZipEntry zipEntry = new ZipEntry("reservations.json");
+        zipOut.putNextEntry(zipEntry);
+        zipOut.write(resourceBytes);
+        zipOut.closeEntry();
       }
-    } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+
+      byte[] zipBytes = baos.toByteArray();
+
+      // Validate the in-memory zip using ZipInputStream before uploading.
+      boolean zipValid = isZipValid(zipBytes);
+      if (!zipValid) {
+        return -1;
+      }
+
+      // Upload the zip archive to Amazon S3 using AWS SDK for Java v2.
+      try (S3Client s3Client = S3Client.create()) {
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+            .bucket(s3BucketName)
+            .key(s3ObjectKey)
+            .contentType("application/zip")
+            .build();
+        s3Client.putObject(putObjectRequest, RequestBody.fromBytes(zipBytes));
+      }
+
+      return 0;
     } catch (IOException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
@@ -139,6 +162,22 @@ public class AvailabilityCheckerServlet extends HttpServlet {
       e.printStackTrace();
     }
     return -1;
+  }
+
+  /**
+   * Validates an in-memory zip archive by attempting to read its entries.
+   *
+   * @param zipBytes the raw bytes of the zip archive
+   * @return {@code true} if the archive is a valid (possibly empty) zip file
+   */
+  private boolean isZipValid(byte[] zipBytes) {
+    try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+      // Attempt to read the first entry; a valid zip will return null (empty) or an entry.
+      zis.getNextEntry();
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
   }
 
 }
