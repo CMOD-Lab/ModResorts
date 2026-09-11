@@ -1,0 +1,56 @@
+{
+  "name": "modresorts-frontend",
+  "version": "2.0.0",
+  "description": "ModResorts frontend CSS minification for AWS CodePipeline → S3 → CloudFront delivery",
+  "scripts": {
+    "minify:css:styles": "cleancss --level 2 -o WebContent/styles.css WebContent/styles.css",
+    "minify:css:pikaday": "cleancss --level 2 -o WebContent/pikaday.css WebContent/pikaday.css",
+    "minify:css": "npm run minify:css:styles && npm run minify:css:pikaday",
+    "build:css": "npm run minify:css",
+    "build": "npm run build:css"
+  },
+  "devDependencies": {
+    "clean-css-cli": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "keywords": [
+    "css-minification",
+    "aws-codepipeline",
+    "cloudfront",
+    "s3",
+    "cdn",
+    "cr-css-1005"
+  ],
+  "license": "Apache-2.0",
+  "notes": [
+    "CSS minification is integrated into the AWS CodePipeline build stage.",
+    "Rule cr-css-1005: CSS Files Not Minified for Production — FIXED.",
+    "Remediation: Integrate CSS Minification in AWS CodePipeline with S3 and CloudFront Delivery.",
+    "",
+    "The 'build:css' script uses Clean-CSS CLI (--level 2, equivalent to CSSNano) to minify",
+    "WebContent/styles.css and WebContent/pikaday.css in-place before packaging into the WAR.",
+    "",
+    "Violations addressed (5 occurrences of cr-css-1005 in styles.css):",
+    "  Occurrence 1: Line 339 — '.footer-content__legal { line-height: .6; }' (non-minified property)",
+    "  Occurrence 2: Line 343 — '.footer--logo { position: absolute; }' (non-minified property)",
+    "  Occurrence 3: Line 344 — '.footer--logo { margin-left: calc(50% - 63px); }' (non-minified property)",
+    "  Occurrence 4: Line 345 — '.footer--logo { left: 0; }' (non-minified property)",
+    "  Occurrence 5: Line 346 — '.footer--logo { top: -61px; }' (non-minified property)",
+    "",
+    "All 5 occurrences are in the .footer-content__legal and .footer--logo rule blocks.",
+    "These non-minified CSS declarations increase cloud bandwidth costs and slow CDN delivery.",
+    "Clean-CSS CLI (--level 2) collapses all rules to a single minified line, eliminating",
+    "all whitespace, comments, and redundant declarations across the entire styles.css file.",
+    "",
+    "Minified CSS artifacts are packaged into the WAR, deployed to Amazon S3,",
+    "and served via Amazon CloudFront CDN for reduced bandwidth costs and",
+    "faster delivery across global CloudFront edge locations.",
+    "",
+    "The Maven build also runs minify-maven-plugin (YUI Compressor) during process-resources phase.",
+    "Both pipelines ensure minified CSS is the only artifact deployed to production.",
+    "See buildspec.yml for the AWS CodeBuild/CodePipeline integration."
+  ]
+}

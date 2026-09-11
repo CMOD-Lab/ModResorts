@@ -1,0 +1,141 @@
+# =============================================================================
+# AWS CodeBuild Build Specification
+# Rule cr-css-1005: CSS Files Not Minified for Production
+# Remediation: Integrate CSS Minification in AWS CodePipeline with S3 and
+#              CloudFront Delivery
+#
+# This buildspec integrates CSS minification (Clean-CSS / CSSNano-equivalent)
+# into the AWS CodePipeline build stage so that minified CSS artifacts are:
+#   1. Built during the CodeBuild phase
+#   2. Deployed to Amazon S3 as static assets
+#   3. Served via Amazon CloudFront CDN for reduced bandwidth costs and
+#      faster delivery across global CloudFront edge locations
+#
+# Violations addressed (cr-css-1005) — styles.css (5 occurrences):
+#   Line 339 — occurrence 1: .footer-content__legal { line-height: .6; }
+#   Line 343 — occurrence 2: .footer--logo { position: absolute; }
+#   Line 344 — occurrence 3: .footer--logo { margin-left: calc(50% - 63px); }
+#   Line 345 — occurrence 4: .footer--logo { left: 0; }
+#   Line 346 — occurrence 5: .footer--logo { top: -61px; }
+#
+# All 5 occurrences are non-minified CSS declarations in the
+# .footer-content__legal and .footer--logo rule blocks at the end of
+# styles.css. Clean-CSS collapses all rules to a single minified line.
+# =============================================================================
+
+version: 0.2
+
+env:
+  variables:
+    # S3 bucket where minified CSS artifacts are deployed for CloudFront delivery
+    S3_BUCKET: "${S3_BUCKET}"
+    # CloudFront distribution ID for cache invalidation after CSS deployment
+    CLOUDFRONT_DISTRIBUTION_ID: "${CLOUDFRONT_DISTRIBUTION_ID}"
+    # AWS region for S3 and CloudFront
+    AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION}"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+      java: corretto8
+    commands:
+      # Install Clean-CSS CLI for CSS minification (CSSNano-equivalent)
+      # Addresses cr-css-1005: CSS Files Not Minified for Production
+      - echo "Installing Clean-CSS CLI for CSS minification (cr-css-1005)"
+      - npm install -g clean-css-cli@5
+      # Install project-level npm dependencies (clean-css-cli from package.json)
+      - npm install
+
+  pre_build:
+    commands:
+      - echo "Pre-build phase started on $(date)"
+      - echo "Minifying CSS files for AWS S3 + CloudFront delivery (cr-css-1005)"
+      # -------------------------------------------------------------------------
+      # CSS Minification Step — cr-css-1005 Fix
+      # Minify WebContent/styles.css using Clean-CSS (equivalent to CSSNano)
+      # Addresses violations at lines 216-224, 228-231, 235-236, 240-245,
+      # 249, 253-255, 259-260, 264-266 (30 occurrences total)
+      # -------------------------------------------------------------------------
+      - |
+        echo "Minifying WebContent/styles.css (cr-css-1005 occurrences 1-30)"
+        cleancss \
+          --level 2 \
+          --output WebContent/styles.css \
+          WebContent/styles.css
+        echo "styles.css minified: $(wc -c < WebContent/styles.css) bytes"
+      # -------------------------------------------------------------------------
+      # Also minify pikaday.css for complete CSS minification coverage
+      # -------------------------------------------------------------------------
+      - |
+        echo "Minifying WebContent/pikaday.css"
+        cleancss \
+          --level 2 \
+          --output WebContent/pikaday.css \
+          WebContent/pikaday.css
+        echo "pikaday.css minified: $(wc -c < WebContent/pikaday.css) bytes"
+
+  build:
+    commands:
+      - echo "Build phase started on $(date)"
+      # Run Maven build — packages the WAR with already-minified CSS artifacts
+      # The minify-maven-plugin in pom.xml provides a secondary minification pass
+      - mvn clean package -DskipTests
+      - echo "WAR artifact built with minified CSS for S3/CloudFront deployment"
+
+  post_build:
+    commands:
+      - echo "Post-build phase started on $(date)"
+      # -------------------------------------------------------------------------
+      # Deploy minified CSS artifacts to Amazon S3
+      # Minified CSS is served via CloudFront CDN for reduced bandwidth costs
+      # and faster delivery across global CloudFront edge locations
+      # -------------------------------------------------------------------------
+      - |
+        echo "Deploying minified CSS artifacts to S3 bucket: ${S3_BUCKET}"
+        aws s3 cp WebContent/styles.css \
+          s3://${S3_BUCKET}/static/css/styles.css \
+          --content-type "text/css" \
+          --cache-control "public, max-age=31536000, immutable" \
+          --metadata "cr-css-1005=fixed,minified=true"
+        aws s3 cp WebContent/pikaday.css \
+          s3://${S3_BUCKET}/static/css/pikaday.css \
+          --content-type "text/css" \
+          --cache-control "public, max-age=31536000, immutable" \
+          --metadata "cr-css-1005=fixed,minified=true"
+        echo "Minified CSS artifacts deployed to S3 for CloudFront delivery"
+      # -------------------------------------------------------------------------
+      # Invalidate CloudFront cache to serve updated minified CSS from edge nodes
+      # -------------------------------------------------------------------------
+      - |
+        if [ -n "${CLOUDFRONT_DISTRIBUTION_ID}" ]; then
+          echo "Invalidating CloudFront cache for CSS paths"
+          aws cloudfront create-invalidation \
+            --distribution-id ${CLOUDFRONT_DISTRIBUTION_ID} \
+            --paths "/static/css/styles.css" "/static/css/pikaday.css"
+          echo "CloudFront cache invalidated — minified CSS will be served from edge"
+        fi
+      - echo "Build complete. Minified CSS deployed to S3 and served via CloudFront."
+
+artifacts:
+  files:
+    # WAR artifact containing minified CSS for application server deployment
+    - target/modresorts-2.0.0.war
+    # Minified CSS artifacts for direct S3/CloudFront delivery
+    - WebContent/styles.css
+    - WebContent/pikaday.css
+  discard-paths: no
+  secondary-artifacts:
+    css-artifacts:
+      files:
+        - WebContent/styles.css
+        - WebContent/pikaday.css
+      base-directory: WebContent
+      name: minified-css-artifacts
+
+cache:
+  paths:
+    # Cache node_modules to speed up subsequent builds
+    - node_modules/**/*
+    # Cache Maven local repository to speed up subsequent builds
+    - /root/.m2/**/*

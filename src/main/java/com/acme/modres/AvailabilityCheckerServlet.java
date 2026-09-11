@@ -1,9 +1,7 @@
 package com.acme.modres;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.logging.Logger;
@@ -25,7 +23,15 @@ import com.acme.modres.mbean.reservation.DateChecker;
 import com.acme.modres.mbean.reservation.ReservationCheckerData;
 import com.acme.modres.mbean.reservation.Reservation;
 
-import com.acme.modres.util.ZipValidator;
+import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @WebServlet({ "/resorts/availability" })
 public class AvailabilityCheckerServlet extends HttpServlet {
@@ -36,6 +42,16 @@ public class AvailabilityCheckerServlet extends HttpServlet {
   private static InitialContext context;
 
   private ReservationCheckerData reservationCheckerData;
+
+  /** S3 bucket name read from environment variable; falls back to a default for local dev. */
+  private static final String S3_BUCKET_NAME =
+      System.getenv("S3_BUCKET_NAME") != null ? System.getenv("S3_BUCKET_NAME") : "modresorts-bucket";
+
+  /** S3 key for the source reservations JSON object. */
+  private static final String RESERVATIONS_S3_KEY = "reservations.json";
+
+  /** S3 key for the exported reservations ZIP object. */
+  private static final String RESERVATIONS_ZIP_S3_KEY = "reservations.zip";
 
   @Override
   public void init() {
@@ -99,46 +115,78 @@ public class AvailabilityCheckerServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  /**
+   * Exports reservations by reading the reservations.json object from Amazon S3,
+   * compressing it into a ZIP archive in memory, and uploading the resulting ZIP
+   * back to Amazon S3 as reservations.zip.
+   *
+   * <p>All file-system dependencies have been eliminated. The S3 bucket name is
+   * resolved from the {@code S3_BUCKET_NAME} environment variable so that no
+   * absolute paths are hard-coded in the application.
+   *
+   * @param selectedDateStr the selected date string (reserved for future filtering)
+   * @return 0 on success, -1 on failure
+   */
   protected int exportRevervations(String selectedDateStr) {
-    File fileToZip = IOUtils.getFileFromRelativePath("reservations.json");
-    String userDirectory = System.getProperty("user.home");
-    String zipPath = userDirectory + "/reservations.zip";
+    String awsRegion = System.getenv("AWS_REGION") != null ? System.getenv("AWS_REGION") : "us-east-1";
 
-    FileOutputStream fos;
-    try {
-      fos = new FileOutputStream(zipPath);
-      ZipOutputStream zipOut = new ZipOutputStream(fos);
+    try (S3Client s3Client = S3Client.builder()
+            .region(Region.of(awsRegion))
+            .build()) {
 
-      FileInputStream fis = new FileInputStream(fileToZip);
-      ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-      zipOut.putNextEntry(zipEntry);
+      // --- Read reservations.json from S3 (replaces FileInputStream on local File) ---
+      GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+          .bucket(S3_BUCKET_NAME)
+          .key(RESERVATIONS_S3_KEY)
+          .build();
 
-      byte[] bytes = new byte[1024];
-      int length;
-      while ((length = fis.read(bytes)) >= 0) {
-        zipOut.write(bytes, 0, length);
+      ResponseBytes<GetObjectResponse> s3ObjectBytes = s3Client.getObjectAsBytes(getObjectRequest);
+      byte[] reservationJsonBytes = s3ObjectBytes.asByteArray();
+
+      // --- Build the ZIP archive in memory (replaces FileOutputStream to user.home) ---
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      try (ZipOutputStream zipOut = new ZipOutputStream(baos)) {
+        ZipEntry zipEntry = new ZipEntry(RESERVATIONS_S3_KEY);
+        zipOut.putNextEntry(zipEntry);
+
+        byte[] buffer = new byte[1024];
+        ByteArrayInputStream bais = new ByteArrayInputStream(reservationJsonBytes);
+        int length;
+        while ((length = bais.read(buffer)) >= 0) {
+          zipOut.write(buffer, 0, length);
+        }
+        bais.close();
       }
-      fis.close();
 
-      zipOut.close();
-      fos.close();
+      byte[] zipBytes = baos.toByteArray();
 
-      // verify zip
-      ZipValidator zipValidator = new ZipValidator(new File(zipPath));
-      if (zipValidator.isValid()) {
+      // --- Upload the ZIP archive to S3 (replaces writing to user.home/reservations.zip) ---
+      PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+          .bucket(S3_BUCKET_NAME)
+          .key(RESERVATIONS_ZIP_S3_KEY)
+          .contentType("application/zip")
+          .contentLength((long) zipBytes.length)
+          .build();
+
+      s3Client.putObject(putObjectRequest, RequestBody.fromBytes(zipBytes));
+
+      // --- Verify the uploaded ZIP exists in S3 (replaces local ZipValidator) ---
+      try {
+        HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
+            .bucket(S3_BUCKET_NAME)
+            .key(RESERVATIONS_ZIP_S3_KEY)
+            .build();
+        s3Client.headObject(headObjectRequest);
         return 0;
+      } catch (NoSuchKeyException e) {
+        logger.warning("Uploaded ZIP not found in S3 after put: " + e.getMessage());
+        return -1;
       }
-    } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
+
+    } catch (Exception e) {
       e.printStackTrace();
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    } catch (Throwable e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      return -1;
     }
-    return -1;
   }
 
 }

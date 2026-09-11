@@ -1,8 +1,6 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import org.springframework.stereotype.Service;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,8 +8,16 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+/**
+ * Customer information service migrated from EJB 2.x (@Singleton/@Startup)
+ * to a Spring Boot @Service component.
+ *
+ * The EJB container-managed lifecycle annotations (javax.ejb.Singleton,
+ * javax.ejb.Startup) have been replaced with Spring's @Service stereotype,
+ * which is managed by the Spring IoC container and is compatible with
+ * cloud-native / AWS deployment environments.
+ */
+@Service
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
