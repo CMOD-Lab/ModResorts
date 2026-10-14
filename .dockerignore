@@ -1,0 +1,49 @@
+# Compiled output
+target/
+build/
+
+# Version control
+.git/
+.gitignore
+
+# Documentation
+*.md
+README*
+CONTRIBUTING*
+LICENSE
+CODEOWNERS
+
+# Maven wrapper (NEVER used in Docker builds)
+mvnw
+mvnw.cmd
+.mvn/
+
+# Gradle wrapper (NEVER used in Docker builds)
+gradlew
+gradlew.bat
+gradle/
+build.gradle*
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Migration bundles
+migration-bundle/
+
+# Test output
+surefire-reports/

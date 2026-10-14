@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookingcomp
+  namespace: bookingcomp
+  labels:
+    app: bookingcomp
+    version: "2.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: bookingcomp
+  template:
+    metadata:
+      labels:
+        app: bookingcomp
+        version: "2.0.0"
+    spec:
+      containers:
+        - name: bookingcomp
+          image: "{{IMAGE_URI}}"
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            # JVM settings
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx512m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dfile.encoding=UTF-8 -Duser.timezone=UTC"
+            - name: TZ
+              value: "UTC"
+            # Redis / ElastiCache – externalized singleton state storage
+            - name: REDIS_HOST
+              value: "{{REDIS_HOST}}"
+            - name: REDIS_PORT
+              value: "{{REDIS_PORT}}"
+            # Weather Underground API key
+            - name: WEATHER_API_KEY
+              value: "{{WEATHER_API_KEY}}"
+            # Remote service discovery URL (Kubernetes DNS-based)
+            - name: REMOTE_SERVICE_URL
+              value: "{{REMOTE_SERVICE_URL}}"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+      terminationGracePeriodSeconds: 30
