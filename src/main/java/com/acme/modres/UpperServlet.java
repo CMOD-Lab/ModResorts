@@ -9,12 +9,30 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.ibm.websphere.servlet.response.ResponseUtils;
+// Removed WebSphere-specific import: com.ibm.websphere.servlet.response.ResponseUtils
+// Using standard Java HTML encoding instead for container portability
 
 @WebServlet("/resorts/upper")
 public class UpperServlet extends HttpServlet {
 
   private static final long serialVersionUID = 1L;
+
+  /**
+   * Encodes a string for safe HTML output, replacing special characters with
+   * their HTML entity equivalents. Replaces the WebSphere-specific
+   * ResponseUtils.encodeDataString() method.
+   */
+  private static String encodeHtml(String input) {
+    if (input == null) {
+      return "";
+    }
+    return input
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#x27;");
+  }
 
   @Override
   protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -26,7 +44,9 @@ public class UpperServlet extends HttpServlet {
     }
 
     String newStr = originalStr.toUpperCase();
-    newStr = ResponseUtils.encodeDataString(newStr);
+    // Replaced WebSphere-specific ResponseUtils.encodeDataString() with
+    // standard HTML encoding for container portability
+    newStr = encodeHtml(newStr);
 
     PrintWriter out = response.getWriter();
     out.print("<br/><b>upper case input " + newStr + "</b>");

@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  bookingcomp:
+    image: bookingcomp:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bookingcomp
+    ports:
+      - "9080:9080"
+    environment:
+      # Redis / ElastiCache connection (replace with actual values)
+      - REDIS_HOST=${REDIS_HOST:-localhost}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      # Weather microservice (optional – falls back to bundled data when unset)
+      - WEATHER_SERVICE_URL=${WEATHER_SERVICE_URL:-}
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      # JVM tuning
+      - JVM_ARGS=-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+      - TZ=UTC
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge

@@ -19,6 +19,10 @@
     <servlet-name>UpperServlet</servlet-name>
     <servlet-class>com.acme.modres.UpperServlet</servlet-class>
   </servlet>
+  <servlet>
+    <servlet-name>HealthServlet</servlet-name>
+    <servlet-class>com.acme.modres.HealthServlet</servlet-class>
+  </servlet>
   <servlet-mapping>
     <servlet-name>WeatherServlet</servlet-name>
     <url-pattern>/weather</url-pattern>
@@ -34,6 +38,10 @@
   <servlet-mapping>
     <servlet-name>UpperServlet</servlet-name>
     <url-pattern>/upper</url-pattern>
+  </servlet-mapping>
+  <servlet-mapping>
+    <servlet-name>HealthServlet</servlet-name>
+    <url-pattern>/health</url-pattern>
   </servlet-mapping>
   <filter>
 	<filter-name>FirstFilter</filter-name>
