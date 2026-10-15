@@ -1,8 +1,6 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import org.springframework.stereotype.Service;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,8 +8,16 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+/**
+ * ModResortsCustomerInformation provides customer data access.
+ *
+ * Cloud-native change: Replaced EJB 2.x annotations (@Singleton, @Startup from
+ * javax.ejb) with Spring Boot @Service stereotype annotation. EJB 2.x requires
+ * a heavy Java EE container which is incompatible with cloud-native deployments.
+ * Spring Boot @Service is a lightweight, container-agnostic alternative that
+ * works with AWS managed services (RDS, ECS, EKS, Fargate).
+ */
+@Service
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
