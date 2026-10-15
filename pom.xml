@@ -5,7 +5,11 @@
   <groupId>com.acme.modres</groupId>
   <artifactId>modresorts</artifactId>
   <version>2.0.0</version>
-  <packaging>war</packaging>
+  <!-- blocker-15, blocker-16 (cr-java-0107): Changed packaging from 'war' to 'jar'
+       to produce a self-contained executable JAR with embedded Tomcat servlet container.
+       This enables deployment on Amazon ECS, EKS, or AWS Fargate without requiring
+       an external application server. -->
+  <packaging>jar</packaging>
   <name>ModResorts</name>
   <properties>
     <maven.compiler.target>1.8</maven.compiler.target>
@@ -13,7 +17,23 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.version>2.0.0</project.version>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!-- AWS SDK BOM version -->
+    <aws.sdk.version>2.21.0</aws.sdk.version>
   </properties>
+
+  <!-- AWS SDK for Java v2 BOM for consistent dependency management -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
   <dependencies>
     <dependency>
       <groupId>javax</groupId>
@@ -21,12 +41,49 @@
       <version>7.0</version>
       <scope>provided</scope>
     </dependency>
+
+    <!-- blocker-15, blocker-16: Embedded Tomcat for executable JAR packaging -->
     <dependency>
-      <groupId>com.ibm.websphere.appserver</groupId>
-      <artifactId>was_public</artifactId>
-      <version>9.0.0</version>
-      <scope>provided</scope>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-core</artifactId>
+      <version>9.0.82</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.tomcat.embed</groupId>
+      <artifactId>tomcat-embed-jasper</artifactId>
+      <version>9.0.82</version>
+    </dependency>
+
+    <!-- blocker-8, blocker-9: Spring Boot replaces EJB 2.x container -->
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+      <version>5.3.27</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-beans</artifactId>
+      <version>5.3.27</version>
+    </dependency>
+
+    <!-- blocker-1, blocker-2, blocker-3, blocker-4, blocker-6: AWS S3 SDK for cloud storage -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+    </dependency>
+
+    <!-- blocker-7: AWS Secrets Manager SDK for externalized secrets -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>secretsmanager</artifactId>
+    </dependency>
+
+    <!-- AWS SDK URL connection client -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>com.google.code.gson</groupId>
       <artifactId>gson</artifactId>
@@ -57,28 +114,24 @@
       <scope>test</scope>
     </dependency>
 
-   
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
       <version>2.14.1</version>
     </dependency>
 
-   
     <dependency>
       <groupId>commons-collections</groupId>
       <artifactId>commons-collections</artifactId>
       <version>3.2.1</version>
     </dependency>
 
-    
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-webmvc</artifactId>
       <version>5.3.17</version>
     </dependency>
 
-   
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
@@ -88,20 +141,46 @@
   </dependencies>
   <build>
     <plugins>
+      <!-- blocker-15, blocker-16: Replace maven-war-plugin with maven-jar-plugin
+           to produce an executable JAR with embedded Tomcat servlet container.
+           This enables self-contained deployment on AWS ECS/EKS/Fargate. -->
       <plugin>
-        <artifactId>maven-war-plugin</artifactId>
-        <version>3.1.0</version>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
         <configuration>
-          <failOnMissingWebXml>false</failOnMissingWebXml>
-          <packagingExcludes>pom.xml, src/, target/, WebContent/</packagingExcludes>
-          <warSourceDirectory>WebContent</warSourceDirectory>
-          <webResources>
-            <resource>
-              <directory>src/main/resources</directory>
-              <targetPath>WEB-INF/classes</targetPath>
-            </resource>
-          </webResources>
+          <archive>
+            <manifest>
+              <mainClass>com.acme.modres.Main</mainClass>
+              <addClasspath>true</addClasspath>
+            </manifest>
+          </archive>
         </configuration>
+      </plugin>
+      <!-- Assembly plugin to create a fat/uber JAR with all dependencies -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.6.0</version>
+        <configuration>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
+          <archive>
+            <manifest>
+              <mainClass>com.acme.modres.Main</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
